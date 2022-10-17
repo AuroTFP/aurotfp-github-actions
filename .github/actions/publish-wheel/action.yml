@@ -1,5 +1,5 @@
 name: 'Publish Wheel'
-description: 'TBD'
+description: 'Publishes a Python wheel to a package index at the destination URL'
 inputs:
   working_directory:
     required: false
