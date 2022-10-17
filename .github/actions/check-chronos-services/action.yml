@@ -1,0 +1,33 @@
+name: 'Check Chronos Services'
+description: 'Checks that the required mock Chronos services can be accessed'
+inputs:
+  pg_user:
+    default: moto
+  pg_password:
+    default: postgres
+  pg_host:
+    default: postgres
+  pg_port:
+    default: 5432
+  moto_host:
+    default: moto
+  moto_port:
+    default: 5000
+runs:
+  using: 'composite'
+  steps:
+    - run: apt-get update && apt-get install --yes postgresql-client
+      shell: bash
+
+    - run: psql -c "SELECT 1"
+      name: Postgres Service Check
+      shell: bash
+      env:
+        PGHOST: ${{ inputs.pg_host }}
+        PGUSER: ${{ inputs.pg_user }}
+        PGPASSWORD: ${{ inputs.pg_password }}
+        PGPORT: ${{ inputs.pg_port }}
+
+    - run: 'curl http://${{ inputs.moto_host }}:${{ inputs.moto_port }}'
+      name: Moto Service Check
+      shell: bash

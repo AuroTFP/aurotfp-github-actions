@@ -1,0 +1,45 @@
+name: 'Extract PyProject Metadata'
+description: 'Extract metadata from the python project'
+inputs:
+  toml_dir:
+    description: 'The path to the pyproject.toml'
+    required: true
+    default: '.'
+outputs:
+  package_version:
+    description: The package version from setup.py
+    value: ${{ steps.set_package_version.outputs.version }}
+  package_name:
+    description: The name of the package from setup.py
+    value: ${{ steps.set_package_name.outputs.package_name }}
+runs:
+  using: 'composite'
+  steps:
+    - run: pip install toml
+      shell: bash
+
+    - name: Set package name
+      working-directory: ${{ inputs.toml_dir }}
+      run: echo "package_name=$(python setup.py --name)" >> $GITHUB_OUTPUT
+      id: set_package_name
+      shell: bash
+    
+    - name: Set package version
+      working-directory: ${{ inputs.toml_dir }}
+      run: echo "version=$(python setup.py --version)" >> $GITHUB_OUTPUT
+      id: set_package_version
+      shell: bash
+
+    - name: Fail on missing package name
+      if: steps.set_package_name.outputs.package_name == ''
+      uses: actions/github-script@v3
+      with:
+        script: |
+            core.setFailed('Failed to determine package name')
+
+    - name: Fail on missing package version
+      if: steps.set_package_version.outputs.version == ''
+      uses: actions/github-script@v3
+      with:
+        script: |
+            core.setFailed('Failed to determine package version')
