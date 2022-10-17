@@ -1,0 +1,216 @@
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        default: null
+        required: false
+        type: string
+      aws_role:
+        default: null
+        required: false
+        type: string
+      dry_run:
+        default: false
+        required: false
+        type: boolean
+        description: |
+          Do not publish artifacts and skip notifications.
+      force_push:
+        default: false
+        required: false
+        type: boolean
+        description: |
+          Trigger jobs that are otherwise run post-merge like publishing artifacts.
+      pyproject_docker_image:
+        required: true
+        type: string
+        description: |
+          Specifies the docker image used during jobs that build the Python project.
+      pip_index_url:
+        required: true
+        type: string
+        description: |
+          The PIP Index URL where Python Wheels are published.
+      slack_alert_channel:
+        required: true
+        type: string
+      working_directory:
+        default: ./
+        required: false
+        type: string
+    secrets:
+      GH_TOKEN:
+        required: true
+      DOCKER_HUB_USERNAME:
+        required: true
+      DOCKER_HUB_PASSWORD:
+        required: true
+      PIP_EXTRA_INDEX_URL:
+        required: true
+      TWINE_USERNAME:
+        required: true
+      TWINE_PASSWORD:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  status:
+    container:
+      image: ${{ inputs.pyproject_docker_image }}
+      credentials:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    env:
+      PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - run: git config --global --add safe.directory '*'
+
+      - run: pip install -U .[dev,test]
+        working-directory: ${{ inputs.working_directory }}
+
+      - run: pre-commit run -a
+        working-directory: ${{ inputs.working_directory }}
+
+      - uses: ./.github/actions/test-pyproject/
+        with:
+          aws_role: ${{ inputs.aws_role }}
+          aws_region: ${{ inputs.aws_region }}
+          working_directory: ${{ inputs.working_directory }}
+
+  package_metadata:
+    runs-on: ubuntu-20.04
+
+    outputs:
+      package_version: ${{ steps.extract_metadata.outputs.package_version }}
+      package_name: ${{ steps.extract_metadata.outputs.package_name }}
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - uses: ./.github/actions/extract-metadata/
+        id: extract_metadata
+        with:
+          toml_dir: ${{ inputs.working_directory }}   
+
+  build_wheel:
+    container:
+      image: ${{ inputs.pyproject_docker_image }}
+      credentials:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    env:
+      PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
+    needs:
+      - status
+    outputs:
+      wheel_artifact: ${{ steps.build_wheel.outputs.wheel_artifact }}
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - name: Build Wheel
+        uses: ./.github/actions/build-wheel/
+        id: build_wheel
+        with:
+          toml_dir: ${{ inputs.working_directory }}
+
+  test_wheel:
+    container:
+      image: ${{ inputs.pyproject_docker_image }}
+      credentials:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    env:
+      PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
+    needs: 
+      - build_wheel
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - run: git config --global --add safe.directory '*'
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ needs.build_wheel.outputs.wheel_artifact }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Install wheel
+        run: pip install ${{ needs.build_wheel.outputs.wheel_artifact }}
+
+      - name: Install test dependencies
+        run: pip install .[test]
+
+      - name: Test artifact
+        uses: ./.github/actions/test-pyproject/
+        with:
+          aws_role: ${{ inputs.aws_role }}
+          aws_region: ${{ inputs.aws_region }}
+          pytest_args: "--no-cov"
+          working_directory: ${{ inputs.working_directory }}
+
+  publish_wheel:
+    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    needs: 
+      - build_wheel
+      - package_metadata
+      - status
+      - test_wheel
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - uses: ./.github/actions/publish-wheel/
+        id: build_and_push_action
+        if: inputs.dry_run == false
+        with:
+          artifact_name: ${{ needs.build_wheel.outputs.wheel_artifact }}
+          destination_url: ${{ inputs.pip_index_url }}
+          tag: ${{ needs.package_metadata.outputs.package_name }}/${{ needs.package_metadata.outputs.package_version }}
+          working_directory: ${{ inputs.working_directory }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+
+      - name: Slack Notification
+        if: inputs.dry_run == false
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: ${{ inputs.slack_alert_channel }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_MESSAGE: |
+            ${{ needs.package_metadata.outputs.package_name }} ${{ needs.package_metadata.outputs.package_version }}
+            library push was a ${{ job.status }}
+          SLACK_TITLE: Wheel Publish Status
+          SLACK_USERNAME: ${{ github.repository }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify_on_failure:
+    needs:
+      - publish_wheel
+      - package_metadata
+    uses: ./.github/workflows/slack-notify.yml
+    if: failure() && github.ref == 'refs/heads/master'
+    with:
+      channel: ${{ inputs.slack_alert_channel }}
+      message: '`${{ needs.package_metadata.outputs.package_name }}` failed to build'
+      color: failure
+      title: Master branch build failure
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

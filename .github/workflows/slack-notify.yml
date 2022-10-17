@@ -1,0 +1,32 @@
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      message:
+        required: true
+        type: string
+      title:
+        required: true
+        type: string
+      color:
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  publish_wheel:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: ${{ inputs.channel }}
+          SLACK_COLOR: ${{ inputs.color }}
+          SLACK_MESSAGE: ${{ inputs.message }}
+          SLACK_TITLE: ${{ inputs.title }}
+          SLACK_USERNAME: ${{ github.repository }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

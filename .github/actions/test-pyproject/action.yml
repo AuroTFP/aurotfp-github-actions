@@ -1,0 +1,64 @@
+name: 'Test Pyproject'
+description: 'Runs pytest on working_dir/tests. Optionally checks that chronos services are accessible'
+inputs:
+  working_directory:
+    default: '.'
+  uses_chronos:
+    default: false
+  pytest_args:
+    default: ""
+  pg_host:
+    default: postgres
+  pg_port:
+    default: 5432
+  pg_user:
+    default: moto
+  pg_password:
+    default: postgres
+  moto_host:
+    default: moto
+  moto_port:
+    default: 5000
+  testing_aws_access_key_id:
+    default: foo
+  testing_aws_secret_access_key:
+    default: bar    
+  aws_role:
+    default: null
+  aws_region:
+    default: null
+runs:
+  using: 'composite'
+  steps:
+    - name: Check Chronos Services
+      uses: ./.github/actions/check-chronos-services/
+      if: inputs.uses_chronos == true
+      with:
+        pg_user: ${{ inputs.pg_user }}
+        pg_password: ${{ inputs.pg_password }}
+        pg_host: ${{ inputs.pg_host }}
+        pg_port: ${{ inputs.pg_port }}
+        moto_host: ${{ inputs.moto_host }}
+        moto_port: ${{ inputs.moto_port }}
+
+    - name: Configure AWS Credentials
+      if: ${{ inputs.aws_role != null && inputs.aws_region != null }}
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: ${{ inputs.aws_role }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - run: pytest ${{ inputs.working_directory }}/tests ${{ inputs.pytest_args }}
+      shell: bash
+      env:
+        # A conftest.py should handle these env variables while testing against chronos
+        IN_GHA: TRUE
+        IN_DOCKER: FALSE
+        POSTGRES_USER: ${{ inputs.pg_user }}
+        POSTGRES_PASSWORD: ${{ inputs.pg_password }}
+        POSTGRES_HOST: ${{ inputs.pg_host }}
+        POSTGRES_PORT: ${{ inputs.pg_port }}
+        MOTO_HOST: ${{ inputs.moto_host }}
+        MOTO_PORT: ${{ inputs.moto_port }}
+        TESTING_AWS_ACCESS_KEY_ID: ${{ inputs.testing_aws_access_key_id }}
+        TESTING_AWS_SECRET_ACCESS_KEY: ${{ inputs.testing_aws_secret_access_key }}

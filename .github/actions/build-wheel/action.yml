@@ -1,0 +1,40 @@
+name: 'Build Wheel'
+description: 'Build a wheel and upload the artifact'
+inputs:
+  toml_dir:
+    description: 'The path to the pyproject.toml'
+    required: true
+    default: '.'
+outputs:
+  wheel_artifact:
+    description: The name of the artifact containing the Wheel
+    value: ${{ steps.set_artifact_output.outputs.wheel_artifact }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Install build deps
+      run: pip install -U setuptools toml wheel
+      shell: bash
+
+    - name: Build wheel
+      run: python -m pip wheel ${{ inputs.toml_dir }} --no-deps --wheel-dir wheels/ 
+      shell: bash
+
+    - name: List wheel
+      run: ls wheels/
+      shell: bash
+
+    - name: Set artifact name
+      run: echo "wheel_file=$(ls wheels/)" >> $GITHUB_ENV 
+      shell: bash
+
+    - name: Set artifact ouput
+      run: echo "wheel_artifact=${{ env.wheel_file }}" >> $GITHUB_OUTPUT
+      id: set_artifact_output
+      shell: bash
+
+    - name: Upload wheel artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ steps.set_artifact_output.outputs.wheel_artifact }}
+        path: wheels/${{ steps.set_artifact_output.outputs.wheel_artifact }}
