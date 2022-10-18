@@ -1,3 +1,3 @@
 # AuroTFP GitHub Actions
 
-Re-usable actions.
+Re-usable actions
