@@ -83,6 +83,7 @@ jobs:
           working_directory: ${{ inputs.working_directory }}
 
   package_metadata:
+    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
     runs-on: ubuntu-20.04
 
     outputs:
@@ -98,6 +99,7 @@ jobs:
           toml_dir: ${{ inputs.working_directory }}   
 
   build_wheel:
+    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
     container:
       image: ${{ inputs.pyproject_docker_image }}
       credentials:
@@ -125,6 +127,7 @@ jobs:
           toml_dir: ${{ inputs.working_directory }}
 
   test_wheel:
+    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
     container:
       image: ${{ inputs.pyproject_docker_image }}
       credentials:
@@ -202,11 +205,11 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   notify_on_failure:
+    if: failure() && (github.ref == 'refs/heads/master' || inputs.force_push)
     needs:
       - publish_wheel
       - package_metadata
     uses: AuroTFP/aurotfp-github-actions/.github/workflows/slack-notify.yml@master
-    if: failure() && github.ref == 'refs/heads/master'
     with:
       channel: ${{ inputs.slack_alert_channel }}
       message: '`${{ needs.package_metadata.outputs.package_name }}` failed to build'
