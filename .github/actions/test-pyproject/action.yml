@@ -31,7 +31,7 @@ runs:
   using: 'composite'
   steps:
     - name: Check Chronos Services
-      uses: AuroTFP/aurotfp-github-actions/.github/actions/check-chronos-services/
+      uses: AuroTFP/aurotfp-github-actions/.github/actions/check-chronos-services@master
       if: inputs.uses_chronos == true
       with:
         pg_user: ${{ inputs.pg_user }}
