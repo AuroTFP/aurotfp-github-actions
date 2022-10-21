@@ -1,0 +1,38 @@
+name: 'Cached Pip Install'
+description: 'Installs package dependencies via pip with a custom cache directory'
+inputs:
+  pip_cache_dir:
+    default: '~/.pipcache'
+    type: string
+  cache_key:
+    default: pip-${{ github.ref }}
+    type: string
+  extras:
+    default: ''
+    type: string
+  working_directory:
+    default: '.'
+    type: string
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Cache
+      id: cache-pip
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.pip_cache_dir }}
+        key: pip-${{ github.ref }}
+
+    - name: List pip cache
+      if: ${{ steps.cache-pip.outputs.cache-hit == 'true' }}
+      continue-on-error: true
+      run: pip cache list --cache-dir ${{ inputs.pip_cache_dir }}
+      shell: bash
+
+    - run: |
+        pip install .[${{ inputs.extras }}] \
+          --cache-dir ${{ inputs.pip_cache_dir }} \
+          --upgrade \
+          --upgrade-strategy eager
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}

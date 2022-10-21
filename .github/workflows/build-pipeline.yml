@@ -31,6 +31,10 @@ on:
         type: string
         description: |
           The PIP Index URL where Python Wheels are published.
+      pip_cache_dir:
+        required: false
+        type: string
+        default: ~/.pipcache
       slack_alert_channel:
         required: true
         type: string
@@ -70,8 +74,10 @@ jobs:
 
       - run: git config --global --add safe.directory '*'
 
-      - run: pip install -U .[dev,test]
-        working-directory: ${{ inputs.working_directory }}
+      - uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
+        with:
+          extras: 'dev,test'
+          working_directory: ${{ inputs.working_directory }}
 
       - run: pre-commit run -a
         working-directory: ${{ inputs.working_directory }}
@@ -156,8 +162,10 @@ jobs:
       - name: Install wheel
         run: pip install ${{ needs.build_wheel.outputs.wheel_artifact }}
 
-      - name: Install test dependencies
-        run: pip install .[test]
+      - uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
+        with:
+          extras: 'test'
+          working_directory: ${{ inputs.working_directory }}
 
       - name: Test artifact
         uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master
