@@ -10,11 +10,15 @@ on:
       cache_key:
         required: true
         type: string
-      working_directory:
-        default: '.'
-        type: string
       container_image:
         required: true
+        type: string
+      pip_cache_dir:
+        default: '~/.pipcache'
+        required: false
+        type: string
+      working_directory:
+        default: '.'
         type: string
     secrets:
       DOCKER_HUB_USERNAME:
@@ -47,6 +51,7 @@ jobs:
           extras: 'dev,test'
           working_directory: ${{ inputs.working_directory }}
           cache_key: ${{ inputs.cache_key }}
+          pip_cache_dir: ${{ inputs.pip_cache_dir }}
 
       - name: Lint
         run: pre-commit run -a
