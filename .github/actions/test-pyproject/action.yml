@@ -22,4 +22,4 @@ runs:
     - run: pytest ${{ inputs.working_directory }}/tests ${{ inputs.pytest_args }}
       shell: bash
       env:
-        IN_DOCKER: TRUE
+        DOCKER_INTERPRETER: TRUE

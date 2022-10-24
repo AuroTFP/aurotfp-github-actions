@@ -72,17 +72,21 @@ jobs:
       - name: Checkout Local
         uses: actions/checkout@v3
 
-      - run: git config --global --add safe.directory '*'
+      - name: Configure Local
+        run: git config --global --add safe.directory '*'
 
-      - uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
+      - name: Cached Pip Install
+        uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
         with:
           extras: 'dev,test'
           working_directory: ${{ inputs.working_directory }}
 
-      - run: pre-commit run -a
+      - name: Lint
+        run: pre-commit run -a
         working-directory: ${{ inputs.working_directory }}
 
-      - uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master
+      - name: Pytest
+        uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master
         with:
           aws_role: ${{ inputs.aws_role }}
           aws_region: ${{ inputs.aws_region }}
