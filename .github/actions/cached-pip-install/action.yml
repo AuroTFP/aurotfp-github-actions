@@ -16,6 +16,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Make Cache Dir
+      run: mkdir ${{ inputs.pip_cache_dir }}
+      shell: bash
+
     - name: Setup Cache
       id: cache-pip
       uses: actions/cache@v3
