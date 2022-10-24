@@ -25,13 +25,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ inputs.pip_cache_dir }}
-        key: pip-${{ github.ref }}
-
-    - name: List pip cache
-      if: ${{ steps.cache-pip.outputs.cache-hit == 'true' }}
-      continue-on-error: true
-      run: pip cache list --cache-dir ${{ inputs.pip_cache_dir }}
-      shell: bash
+        key: ${{ inputs.cache_key }}
 
     - run: |
         pip install .[${{ inputs.extras }}] \

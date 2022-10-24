@@ -1,0 +1,60 @@
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        required: true
+        type: string
+      aws_role:
+        required: true
+        type: string
+      cache_key:
+        required: true
+        type: string
+      working_directory:
+        default: '.'
+        type: string
+      container_image:
+        required: true
+        type: string
+    secrets:
+      DOCKER_HUB_USERNAME:
+        required: true
+      DOCKER_HUB_PASSWORD:
+        required: true
+      PIP_EXTRA_INDEX_URL:
+        required: true
+
+jobs:
+  status_checks:
+    container:
+      image: ${{ inputs.container_image }}
+      credentials:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    env:
+      PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - name: Configure Local
+        run: git config --global --add safe.directory '*'
+
+      - name: Cached Pip Install
+        uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
+        with:
+          extras: 'dev,test'
+          working_directory: ${{ inputs.working_directory }}
+          cache_key: ${{ inputs.cache_key }}
+
+      - name: Lint
+        run: pre-commit run -a
+        working-directory: ${{ inputs.working_directory }}
+
+      - name: Pytest
+        uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master
+        with:
+          aws_role: ${{ inputs.aws_role }}
+          aws_region: ${{ inputs.aws_region }}
+          working_directory: ${{ inputs.working_directory }}

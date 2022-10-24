@@ -9,6 +9,11 @@ on:
         default: null
         required: false
         type: string
+      cache_key:
+        default: pip-${{ github.ref }}
+        description: |
+          Specifies the cache key used to load/save pip install dependencies
+        type: string
       dry_run:
         default: false
         required: false
@@ -60,37 +65,18 @@ on:
 
 jobs:
   status:
-    container:
-      image: ${{ inputs.pyproject_docker_image }}
-      credentials:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-    env:
+    uses: AuroTFP/aurotfp-github-actions/.github/workflows/status-check.yml@master
+    with:
+      aws_region: ${{ inputs.aws_region }}
+      aws_role: ${{ inputs.aws_role }}
+      cache_key: ${{ inputs.cache_key }}
+      container_image: ${{ inputs.pyproject_docker_image }}
+      working_directory: ${{ inputs.working_directory }}
+    secrets:
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout Local
-        uses: actions/checkout@v3
 
-      - name: Configure Local
-        run: git config --global --add safe.directory '*'
-
-      - name: Cached Pip Install
-        uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
-        with:
-          extras: 'dev,test'
-          working_directory: ${{ inputs.working_directory }}
-
-      - name: Lint
-        run: pre-commit run -a
-        working-directory: ${{ inputs.working_directory }}
-
-      - name: Pytest
-        uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master
-        with:
-          aws_role: ${{ inputs.aws_role }}
-          aws_region: ${{ inputs.aws_region }}
-          working_directory: ${{ inputs.working_directory }}
 
   package_metadata:
     if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
