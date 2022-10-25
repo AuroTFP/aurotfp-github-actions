@@ -13,8 +13,16 @@ on:
       container_image:
         required: true
         type: string
-      pip_cache_dir:
-        default: '~/.pipcache'
+      cache_dir:
+        default: '~/.cache'
+        required: false
+        type: string
+      pip_dir:
+        default: '~/.cache/pip'
+        required: false
+        type: string
+      pre_commit_dir:
+        default: '~/.cache/pre-commit'
         required: false
         type: string
       working_directory:
@@ -48,14 +56,20 @@ jobs:
       - name: Cached Pip Install
         uses: AuroTFP/aurotfp-github-actions/.github/actions/cached-pip-install@master
         with:
+          cache_dir: ${{ inputs.cache_dir }}
           extras: 'dev,test'
+          pip_dir: ${{ inputs.pip_dir }}
           working_directory: ${{ inputs.working_directory }}
-          cache_key: ${{ inputs.cache_key }}
-          pip_cache_dir: ${{ inputs.pip_cache_dir }}
+
+      - name: Make Pre Commit Dir
+        shell: bash
+        run: mkdir -p ${{ inputs.pre_commit_dir }}
 
       - name: Lint
         run: pre-commit run -a
         working-directory: ${{ inputs.working_directory }}
+        env:
+          PRE_COMMIT_HOME: ${{ inputs.pre_commit_dir }}
 
       - name: Pytest
         uses: AuroTFP/aurotfp-github-actions/.github/actions/test-pyproject@master

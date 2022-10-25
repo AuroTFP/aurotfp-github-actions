@@ -1,11 +1,13 @@
 name: 'Cached Pip Install'
 description: 'Installs package dependencies via pip with a custom cache directory'
 inputs:
-  pip_cache_dir:
-    default: '~/.pipcache'
+  cache_dir:
+    default: '~/.cache'
+    required: false
     type: string
-  cache_key:
-    default: pip-${{ github.ref }}
+  pip_dir:
+    default: '~/.cache/pip'
+    required: false
     type: string
   extras:
     default: ''
@@ -16,20 +18,29 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Make Cache Dir
-      run: mkdir ${{ inputs.pip_cache_dir }}
+    - name: Setup
+      run: |
+        mkdir -p ${{ inputs.cache_dir }}
+        mkdir -p ${{ inputs.pip_dir }}
       shell: bash
+
+    - name: Set Cache Key
+      id: cache-key-files
+      shell: bash
+      run: |
+        echo "pyproject_toml_path=${{ inputs.working_directory}}/pyproject.toml" >> $GITHUB_OUTPUT
+        echo "pre_commit_path=${{ inputs.working_directory }}/.pre-commit-config.yaml" >> $GITHUB_OUTPUT
 
     - name: Setup Cache
       id: cache-pip
       uses: actions/cache@v3
       with:
-        path: ${{ inputs.pip_cache_dir }}
-        key: ${{ inputs.cache_key }}
+        path: ${{ inputs.cache_dir }}
+        key: ${{ runner.os }}-pip-${{ hashFiles(steps.cache-key-files.outputs.pyproject_toml_path, steps.cache-key-files.outputs.pre_commit_path) }}
 
     - run: |
         pip install .[${{ inputs.extras }}] \
-          --cache-dir ${{ inputs.pip_cache_dir }} \
+          --cache-dir ${{ inputs.pip_dir }} \
           --upgrade \
           --upgrade-strategy eager
       shell: bash
