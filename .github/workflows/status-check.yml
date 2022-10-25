@@ -7,9 +7,6 @@ on:
       aws_role:
         required: true
         type: string
-      cache_key:
-        required: true
-        type: string
       container_image:
         required: true
         type: string
