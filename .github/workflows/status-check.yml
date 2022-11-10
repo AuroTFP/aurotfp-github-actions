@@ -73,4 +73,5 @@ jobs:
         with:
           aws_role: ${{ inputs.aws_role }}
           aws_region: ${{ inputs.aws_region }}
+          pytest_args: --cov-report term-missing
           working_directory: ${{ inputs.working_directory }}
