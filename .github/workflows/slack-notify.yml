@@ -19,7 +19,7 @@ on:
 
 jobs:
   publish_wheel:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     steps:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2

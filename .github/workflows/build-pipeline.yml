@@ -70,7 +70,7 @@ jobs:
 
   package_metadata:
     if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     outputs:
       package_version: ${{ steps.extract_metadata.outputs.package_version }}
@@ -100,7 +100,7 @@ jobs:
       - status
     outputs:
       wheel_artifact: ${{ steps.build_wheel.outputs.wheel_artifact }}
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Local
@@ -126,7 +126,7 @@ jobs:
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
     needs: 
       - build_wheel
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Local
@@ -162,7 +162,7 @@ jobs:
       - package_metadata
       - status
       - test_wheel
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     steps:
       - name: Checkout Local
         uses: actions/checkout@v3

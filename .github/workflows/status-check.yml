@@ -42,7 +42,7 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
     env:
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     steps:
       - name: Checkout Local
         uses: actions/checkout@v3
