@@ -38,6 +38,10 @@ on:
         default: '.'
         required: false
         type: string
+      main_ref:
+        default: 'refs/heads/master'
+        required: false
+        type: string
     secrets:
       GH_TOKEN:
         required: true
@@ -69,7 +73,7 @@ jobs:
 
 
   package_metadata:
-    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    if: success() && (github.ref == inputs.main_ref || inputs.force_push)
     runs-on: self-hosted
 
     outputs:
@@ -85,7 +89,7 @@ jobs:
           toml_dir: ${{ inputs.working_directory }}   
 
   build_wheel:
-    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    if: success() && (github.ref == inputs.main_ref || inputs.force_push)
     container:
       image: ${{ inputs.pyproject_docker_image }}
       credentials:
@@ -113,7 +117,7 @@ jobs:
           toml_dir: ${{ inputs.working_directory }}
 
   test_wheel:
-    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    if: success() && (github.ref == inputs.main_ref || inputs.force_push)
     container:
       image: ${{ inputs.pyproject_docker_image }}
       credentials:
@@ -156,7 +160,7 @@ jobs:
           working_directory: ${{ inputs.working_directory }}
 
   publish_wheel:
-    if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    if: success() && (github.ref == inputs.main_ref || inputs.force_push)
     needs: 
       - build_wheel
       - package_metadata
