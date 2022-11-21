@@ -171,7 +171,7 @@ jobs:
         if: inputs.dry_run == false
         with:
           artifact_name: ${{ needs.build_wheel.outputs.wheel_artifact }}
-          destination_url: ${{ inputs.pip_index_url }}
+          destination_url: ${{ secrets.PIP_EXTRA_INDEX_URL }}
           tag: ${{ needs.package_metadata.outputs.package_name }}/${{ needs.package_metadata.outputs.package_version }}
           working_directory: ${{ inputs.working_directory }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
