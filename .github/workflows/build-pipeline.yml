@@ -26,11 +26,6 @@ on:
         type: string
         description: |
           Specifies the docker image used during jobs that build the Python project.
-      pip_index_url:
-        required: true
-        type: string
-        description: |
-          The PIP Index URL where Python Wheels are published.
       slack_alert_channel:
         required: true
         type: string
