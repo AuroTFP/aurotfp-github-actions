@@ -197,7 +197,7 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   notify_on_failure:
-    if: failure() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    if: failure() && (github.ref == inputs.main_ref || inputs.force_push)
     needs:
       - publish_wheel
       - package_metadata
