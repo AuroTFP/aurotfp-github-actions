@@ -7,6 +7,15 @@ on:
       aws_role:
         required: true
         type: string
+      aws_ecr_registry:
+        required: true
+        type: string
+      docker_username:
+        required: true
+        type: string
+      docker_password:
+        required: true
+        type: string
       container_image:
         required: true
         type: string
@@ -36,10 +45,10 @@ on:
 jobs:
   status_checks:
     container:
-      image: ${{ inputs.container_image }}
+      image: ${{ inputs.aws_ecr_registry }}/${{ inputs.container_image }}
       credentials:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        username: ${{ inputs.docker_username }}
+        password: ${{ inputs.docker_password }}
     env:
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
     runs-on: self-hosted

@@ -1,14 +1,23 @@
 on:
   workflow_call:
     inputs:
+      aws_account:
+        required: true
+        type: string
       aws_region:
-        default: null
-        required: false
+        required: true
         type: string
       aws_role:
-        default: null
-        required: false
+        required: true
         type: string
+      aws_ecr_registry:
+        required: true
+        type: string
+      build_docker_image:
+        default: false
+        required: false
+        type: boolean
+        description: Build and push a docker image with the wheel installed.
       dry_run:
         default: false
         required: false
@@ -21,6 +30,24 @@ on:
         type: boolean
         description: |
           Trigger jobs that are otherwise run post-merge like publishing artifacts.
+      package_image_repo:
+        default: ''
+        required: false
+        type: string
+        description: |
+          The name of the GitHub repo containing the base Dockerfile.
+      package_image_file:
+        default: ''
+        required: false
+        type: string
+        description: |
+          The name of the base Dockerfile used to build the Python package image artifact.
+      package_image_extras:
+        default: ''
+        required: false
+        type: string
+        description: |
+          Specifies the Python package extras to install in the image artifact.
       pyproject_docker_image:
         required: true
         type: string
@@ -30,7 +57,9 @@ on:
         required: true
         type: string
         description: |
-          The PIP Index URL where Python Wheels are published.
+          Base URL of a Python Package Index where Python Wheels are published.
+          This URL should not include authorization credentials.
+          See the secret: PIP_EXTRA_INDEX_URL
       slack_alert_channel:
         required: true
         type: string
@@ -47,6 +76,9 @@ on:
         required: true
       PIP_EXTRA_INDEX_URL:
         required: true
+        description: |
+          The fully qualified Python Package Index URL. This includes the
+          credentials required to authenticate with a private package index.
       TWINE_USERNAME:
         required: true
       TWINE_PASSWORD:
@@ -55,12 +87,27 @@ on:
         required: true
 
 jobs:
+  login-to-amazon-ecr:
+    runs-on: self-hosted
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+    outputs:
+      docker_username: ${{ steps.login-ecr.outputs[format('docker_username_{0}_dkr_ecr_us_east_1_amazonaws_com', inputs.aws_account)] }}
+      docker_password: ${{ steps.login-ecr.outputs[format('docker_password_{0}_dkr_ecr_us_east_1_amazonaws_com', inputs.aws_account)] }}
+
   status:
-    uses: AuroTFP/aurotfp-github-actions/.github/workflows/status-check.yml@master
+    needs:
+      - login-to-amazon-ecr
+    uses: ./.github/workflows/status-check.yml
     with:
       aws_region: ${{ inputs.aws_region }}
       aws_role: ${{ inputs.aws_role }}
+      aws_ecr_registry: ${{ inputs.aws_ecr_registry }}
       container_image: ${{ inputs.pyproject_docker_image }}
+      docker_username: ${{ needs.login-to-amazon-ecr.outputs.docker_username }}
+      docker_password: ${{ needs.login-to-amazon-ecr.outputs.docker_password }}
       working_directory: ${{ inputs.working_directory }}
     secrets:
       DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
@@ -71,7 +118,6 @@ jobs:
   package_metadata:
     if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
     runs-on: self-hosted
-
     outputs:
       package_version: ${{ steps.extract_metadata.outputs.package_version }}
       package_name: ${{ steps.extract_metadata.outputs.package_name }}
@@ -86,18 +132,18 @@ jobs:
 
   build_wheel:
     if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    needs:
+      - login-to-amazon-ecr
     container:
-      image: ${{ inputs.pyproject_docker_image }}
+      image: ${{ inputs.aws_ecr_registry }}/${{ inputs.pyproject_docker_image }}
       credentials:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        username: ${{ needs.login-to-amazon-ecr.outputs.docker_username }}
+        password: ${{ needs.login-to-amazon-ecr.outputs.docker_password }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
     env:
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
-    needs:
-      - status
     outputs:
       wheel_artifact: ${{ steps.build_wheel.outputs.wheel_artifact }}
     runs-on: self-hosted
@@ -114,18 +160,19 @@ jobs:
 
   test_wheel:
     if: success() && (github.ref == 'refs/heads/master' || inputs.force_push)
+    needs: 
+      - build_wheel
+      - login-to-amazon-ecr
     container:
-      image: ${{ inputs.pyproject_docker_image }}
+      image: ${{ inputs.aws_ecr_registry }}/${{ inputs.pyproject_docker_image }}
       credentials:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        username: ${{ needs.login-to-amazon-ecr.outputs.docker_username }}
+        password: ${{ needs.login-to-amazon-ecr.outputs.docker_password }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
     env:
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
-    needs: 
-      - build_wheel
     runs-on: self-hosted
 
     steps:
@@ -192,9 +239,38 @@ jobs:
           SLACK_USERNAME: ${{ github.repository }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  build_and_push_image:
+    if: |
+      success()
+      && inputs.build_docker_image
+      && (github.ref == 'refs/heads/master' || inputs.force_push)
+    needs:
+      - build_wheel
+      - package_metadata
+      - status
+      - test_wheel
+    uses: AuroTFP/aurotfp-github-actions/.github/workflows/build-docker-pyproject.yml
+    with:
+      aws_account: ${{ inputs.aws_account }}
+      aws_role: ${{ inputs.aws_role }}
+      aws_region: ${{ inputs.aws_region }}
+      wheel_artifact: ${{ needs.build_wheel.outputs.wheel_artifact }}
+      image_name: ${{ needs.package_metadata.outputs.package_name }}
+      image_version: ${{ needs.package_metadata.outputs.package_version }}
+      push_image: ${{ ! inputs.dry_run }}
+      package_image_repo: ${{ inputs.package_image_repo }}
+      package_image_file: ${{ inputs.package_image_file }}
+      package_image_extras: ${{ inputs.package_image_extras }}
+      slack_alert_channel: ${{ inputs.slack_alert_channel }}
+      working_directory: ${{ inputs.working_directory }}
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
+
   notify_on_failure:
     if: failure() && (github.ref == 'refs/heads/master' || inputs.force_push)
     needs:
+      - build_and_push_image
       - publish_wheel
       - package_metadata
     uses: AuroTFP/aurotfp-github-actions/.github/workflows/slack-notify.yml@master

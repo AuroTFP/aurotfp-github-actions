@@ -1,0 +1,117 @@
+on:
+  workflow_call:
+    inputs:
+      aws_account:
+        required: true
+        type: string
+      aws_role:
+        required: true
+        type: string
+      aws_region:
+        required: true
+        type: string
+      wheel_artifact:
+        required: true
+        type: string
+      image_name:
+        required: true
+        type: string
+      image_version:
+        required: true
+        type: string
+      push_image:
+        default: false
+        type: boolean
+      package_image_repo:
+        required: true
+        type: string
+      package_image_file:
+        required: true
+        type: string
+      package_image_extras:
+        default: ""
+        type: string
+      slack_alert_channel:
+        required: true
+        type: string
+      working_directory:
+        default: ./
+        type: string
+    secrets:
+      GH_TOKEN:
+        required: true
+      PIP_EXTRA_INDEX_URL:
+        required: true
+
+jobs:
+  build_and_push_image:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Local
+        uses: actions/checkout@v3
+
+      - name: Checkout Quant Docker Images
+        uses: actions/checkout@v3
+        with:
+          repository: AuroTFP/${{ inputs.package_image_repo }}
+          token: ${{ secrets.GH_TOKEN }}
+          path: ${{ inputs.working_directory }}/${{ inputs.package_image_repo }}/
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.wheel_artifact }}
+          path: ${{ inputs.working_directory }}
+
+      - name: Install AWS CLI
+        shell: bash
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          aws --version
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Tag Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ inputs.image_name }}
+          IMAGE_TAG: ${{ inputs.image_version }}
+          FILE: ${{ inputs.working_directory }}/${{ inputs.package_image_repo }}/${{ inputs.package_image_file }}
+          WHEEL: ${{ inputs.wheel_artifact }}
+          EXTRAS: ${{ inputs.package_image_extras }}
+          WORK_DIR: ${{ inputs.working_directory }}
+        shell: bash
+        run: |
+          docker build $WORK_DIR \
+            -f $FILE \
+            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+            --build-arg PIP_URL=${{ secrets.PIP_EXTRA_INDEX_URL }} \
+            --build-arg WHEEL=$WHEEL \
+            --build-arg EXTRAS=$EXTRAS
+
+      - name: Push Image to ECR
+        if: ${{ inputs.push_image }}
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ inputs.image_name }}
+          IMAGE_TAG: ${{ inputs.image_version }}
+        run: |
+          aws ecr create-repository --repository-name $REPOSITORY || true
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+        shell: bash
+
+      - name: Slack Notification
+        if: always() && inputs.push_image
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: ${{ inputs.slack_alert_channel }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_MESSAGE: |
+            ${{ inputs.image_name }}:${{ inputs.image_version }}
+            image push was a ${{ job.status }}
+          SLACK_TITLE: Docker Image Push Status
+          SLACK_USERNAME: ${{ github.repository }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

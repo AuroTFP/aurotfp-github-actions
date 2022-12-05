@@ -5,19 +5,14 @@ inputs:
     default: '.'
   pytest_args:
     default: ""
-  aws_role:
-    default: null
-  aws_region:
-    default: null
 runs:
   using: 'composite'
   steps:
     - name: Configure AWS Credentials
-      if: ${{ inputs.aws_role != null && inputs.aws_region != null }}
-      uses: aws-actions/configure-aws-credentials@v1-node16
+      uses: AuroTFP/aurotfp-github-actions/.github/actions/setup-aws-creds@master
       with:
-        role-to-assume: ${{ inputs.aws_role }}
-        aws-region: ${{ inputs.aws_region }}
+        aws_role: ${{ inputs.aws_role }}
+        aws_region: ${{ inputs.aws_region }}
 
     - run: pytest ${{ inputs.working_directory }}/tests ${{ inputs.pytest_args }}
       shell: bash

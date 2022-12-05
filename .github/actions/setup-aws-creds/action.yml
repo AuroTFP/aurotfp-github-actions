@@ -1,0 +1,16 @@
+name: 'Setup AWS Creds'
+description: 'Configures AWS Credentials for GitHub Actions jobs'
+inputs:
+  aws_role:
+    default: null
+  aws_region:
+    default: null
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure AWS Credentials
+      if: ${{ inputs.aws_role != null && inputs.aws_region != null }}
+      uses: aws-actions/configure-aws-credentials@v1-node16
+      with:
+        role-to-assume: ${{ inputs.aws_role }}
+        aws-region: ${{ inputs.aws_region }}
