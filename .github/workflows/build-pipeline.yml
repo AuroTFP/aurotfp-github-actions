@@ -110,8 +110,6 @@ jobs:
       docker_password: ${{ needs.login-to-amazon-ecr.outputs.docker_password }}
       working_directory: ${{ inputs.working_directory }}
     secrets:
-      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
 
 
