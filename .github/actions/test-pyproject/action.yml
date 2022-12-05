@@ -1,6 +1,12 @@
 name: 'Test Pyproject'
 description: 'Runs pytest on working_dir/tests. Optionally checks that chronos services are accessible'
 inputs:
+  aws_region:
+    required: true
+    type: string
+  aws_role:
+    required: true
+    type: string
   working_directory:
     default: '.'
   pytest_args:
