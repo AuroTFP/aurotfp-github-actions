@@ -70,10 +70,6 @@ on:
     secrets:
       GH_TOKEN:
         required: true
-      DOCKER_HUB_USERNAME:
-        required: true
-      DOCKER_HUB_PASSWORD:
-        required: true
       PIP_EXTRA_INDEX_URL:
         required: true
         description: |
@@ -100,7 +96,7 @@ jobs:
   status:
     needs:
       - login-to-amazon-ecr
-    uses: ./.github/workflows/status-check.yml
+    uses: AuroTFP/aurotfp-github-actions/.github/workflows/status-check.yml@master
     with:
       aws_region: ${{ inputs.aws_region }}
       aws_role: ${{ inputs.aws_role }}
@@ -110,6 +106,8 @@ jobs:
       docker_password: ${{ needs.login-to-amazon-ecr.outputs.docker_password }}
       working_directory: ${{ inputs.working_directory }}
     secrets:
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
       PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
 
 
@@ -247,7 +245,7 @@ jobs:
       - package_metadata
       - status
       - test_wheel
-    uses: AuroTFP/aurotfp-github-actions/.github/workflows/build-docker-pyproject.yml
+    uses: AuroTFP/aurotfp-github-actions/.github/workflows/build-docker-pyproject.yml@master
     with:
       aws_account: ${{ inputs.aws_account }}
       aws_role: ${{ inputs.aws_role }}
